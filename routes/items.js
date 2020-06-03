@@ -7,7 +7,9 @@ const Item = require('../models/Item');
 // GET api/items
 router.get('/', async (req, res) => {
   try {
-    const items = await Item.find().sort({ refId: 1 });
+    const items = await Item.find()
+      .collation({ locale: 'en', numericOrdering: true })
+      .sort({ refId: 1 });
     res.json(items);
   } catch (error) {
     console.error(error.message);

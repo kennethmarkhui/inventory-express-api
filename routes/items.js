@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     res.json(items);
   } catch (error) {
     console.error(error.message);
-    res.status(500).send('Server Error');
+    res.status(500).json({ msg: 'Server Error: Could not fetch item.' });
   }
 });
 
@@ -32,17 +32,29 @@ router.post(
     if (!errors.isEmpty()) {
       return res.status(400).json({ errors: errors.array() });
     }
-    const { refId, name, storage, category, period, country, area } = req.body;
+    const {
+      refId,
+      name,
+      storage,
+      category,
+      period,
+      country,
+      area,
+      size1L,
+      size1W,
+      size2L,
+      size2W,
+    } = req.body;
     try {
-      let item = await Item.findOne({ refId });
-      if (item) {
+      let addedItem = await Item.findOne({ refId });
+      if (addedItem) {
         return res.status(400).json({
           msg:
             'The Ref ID you provided already exists in the database. Please enter a new Ref ID.',
         });
       }
 
-      item = new Item({
+      addedItem = new Item({
         refId,
         image: 'https://via.placeholder.com/600/',
         name,
@@ -51,28 +63,47 @@ router.post(
         period: period || null,
         location: { country: country, area: area || null },
         sizes: [
-          { len: 1, wid: 2 },
-          { len: 3, wid: 4 },
+          { len: size1L, wid: size1W },
+          { len: size2L, wid: size2W },
         ],
       });
 
-      await item.save();
-      res.send('Item added!');
+      const item = await addedItem.save();
+      res.status(201).json(item);
     } catch (error) {
       console.error(error.message);
-      res.status(500).send('Server Error');
+      res.status(500).json({ msg: 'Server Error: Could not add item.' });
     }
   }
 );
 
-// PUT api/items/:id
-router.put('/:id', (req, res) => {
+// PATCH api/items/:id
+router.patch('/:id', (req, res) => {
   res.send('update item');
 });
 
 // DELETE api/items/:id
-router.delete('/:id', (req, res) => {
-  res.send('delete item');
+router.delete('/:id', async (req, res) => {
+  const itemId = req.params.id;
+
+  let item;
+  try {
+    item = await Item.findById(itemId);
+  } catch (error) {
+    res.status(500).json({ msg: 'Server Error: Could not delete item.' });
+  }
+
+  if (!item) {
+    res.status(404).json({ msg: 'Could not find item for the provided id.' });
+  }
+
+  try {
+    await item.remove();
+  } catch (error) {
+    res.status(500).json({ msg: 'Server Error: Could not delete item.' });
+  }
+
+  res.status(200).json({ msg: 'Item has be succesfully deleted.' });
 });
 
 module.exports = router;

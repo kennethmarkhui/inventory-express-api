@@ -13,7 +13,7 @@ router.get('/', async (req, res) => {
     res.json(items);
   } catch (error) {
     console.error(error.message);
-    res.status(500).json({ msg: 'Server Error: Could not fetch item.' });
+    return res.status(500).json({ msg: 'Server Error: Could not fetch item.' });
   }
 });
 
@@ -21,7 +21,7 @@ router.get('/', async (req, res) => {
 router.post(
   '/',
   [
-    check('refId', 'Ref ID should not be empty.').not().isEmpty(),
+    check('refId', 'Reference ID should not be empty.').not().isEmpty(),
     check('name', 'Name must not be empty.').not().isEmpty(),
     check('storage', 'Storage must not be empty.').not().isEmpty(),
     check('category', 'Category must not be empty.').not().isEmpty(),
@@ -56,7 +56,9 @@ router.post(
 
       addedItem = new Item({
         refId,
-        image: 'https://via.placeholder.com/600/',
+        image: `https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/${
+          Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000
+        }/${Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000}`,
         name,
         storage,
         category,
@@ -85,16 +87,16 @@ router.get('/:refId', async (req, res) => {
   try {
     item = await Item.findOne({ refId: itemRefId });
   } catch (error) {
-    res.status(500).json({ msg: 'Server Error: Could not find item.' });
+    return res.status(500).json({ msg: 'Server Error: Could not find item.' });
   }
 
   if (!item) {
-    res
+    return res
       .status(404)
       .json({ msg: 'Could not find item for the provided refId.' });
   }
 
-  res.status(200).json(item);
+  res.json(item);
 });
 
 // PATCH api/items/:id
@@ -110,17 +112,23 @@ router.delete('/:id', async (req, res) => {
   try {
     item = await Item.findById(itemId);
   } catch (error) {
-    res.status(500).json({ msg: 'Server Error: Could not delete item.' });
+    return res
+      .status(500)
+      .json({ msg: 'Server Error: Could not delete item.' });
   }
 
   if (!item) {
-    res.status(404).json({ msg: 'Could not find item for the provided id.' });
+    return res
+      .status(404)
+      .json({ msg: 'Could not find item for the provided id.' });
   }
 
   try {
     await item.remove();
   } catch (error) {
-    res.status(500).json({ msg: 'Server Error: Could not delete item.' });
+    return res
+      .status(500)
+      .json({ msg: 'Server Error: Could not delete item.' });
   }
 
   res.status(200).json({ msg: 'Item has be succesfully deleted.' });

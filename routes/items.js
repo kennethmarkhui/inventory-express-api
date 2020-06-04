@@ -77,6 +77,26 @@ router.post(
   }
 );
 
+// GET api/items/:refId
+router.get('/:refId', async (req, res) => {
+  const itemRefId = req.params.refId;
+
+  let item;
+  try {
+    item = await Item.findOne({ refId: itemRefId });
+  } catch (error) {
+    res.status(500).json({ msg: 'Server Error: Could not find item.' });
+  }
+
+  if (!item) {
+    res
+      .status(404)
+      .json({ msg: 'Could not find item for the provided refId.' });
+  }
+
+  res.status(200).json(item);
+});
+
 // PATCH api/items/:id
 router.patch('/:id', (req, res) => {
   res.send('update item');

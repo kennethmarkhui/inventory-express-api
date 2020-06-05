@@ -30,7 +30,13 @@ router.post(
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      return res.status(400).json({ errors: errors.array() });
+      let errMsgs = [];
+      errors.errors.map((err) => errMsgs.push(err.param));
+      return res.status(422).json({
+        msg: `Invalid Input: Please check the following data: ${errMsgs.join(
+          ', '
+        )}`,
+      });
     }
     const {
       refId,
@@ -45,6 +51,7 @@ router.post(
       size2L,
       size2W,
     } = req.body;
+
     try {
       let addedItem = await Item.findOne({ refId });
       if (addedItem) {

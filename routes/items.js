@@ -6,15 +6,17 @@ const Item = require('../models/Item');
 
 // GET api/items
 router.get('/', async (req, res) => {
+  let items;
   try {
-    const items = await Item.find()
+    items = await Item.find()
       .collation({ locale: 'en', numericOrdering: true })
       .sort({ refId: 1 });
-    res.json(items);
   } catch (error) {
-    console.error(error.message);
-    return res.status(500).json({ msg: 'Server Error: Could not fetch item.' });
+    return res
+      .status(500)
+      .json({ msg: 'Server Error: Could not fetch items.' });
   }
+  res.json(items);
 });
 
 // POST api/items
@@ -38,6 +40,7 @@ router.post(
         )}`,
       });
     }
+
     const {
       refId,
       name,
@@ -52,37 +55,43 @@ router.post(
       size2W,
     } = req.body;
 
+    let existingItem;
     try {
-      let addedItem = await Item.findOne({ refId });
-      if (addedItem) {
-        return res.status(400).json({
-          msg:
-            'The Ref ID you provided already exists in the database. Please enter a new Ref ID.',
-        });
-      }
-
-      addedItem = new Item({
-        refId,
-        image: `https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/${
-          Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000
-        }/${Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000}`,
-        name,
-        storage,
-        category,
-        period: period || null,
-        location: { country: country, area: area || null },
-        sizes: [
-          { len: size1L, wid: size1W },
-          { len: size2L, wid: size2W },
-        ],
-      });
-
-      const item = await addedItem.save();
-      res.status(201).json(item);
+      existingItem = await Item.findOne({ refId });
     } catch (error) {
-      console.error(error.message);
-      res.status(500).json({ msg: 'Server Error: Could not add item.' });
+      return res.status(500).json({ msg: 'Server Error: Could not add item.' });
     }
+
+    if (existingItem) {
+      return res.status(400).json({
+        msg:
+          'The Ref ID you provided already exists in the database. Please enter a new Ref ID.',
+      });
+    }
+
+    const addedItem = new Item({
+      refId,
+      image: `https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/${
+        Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000
+      }/${Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000}`,
+      name,
+      storage,
+      category,
+      period: period || null,
+      location: { country: country, area: area || null },
+      sizes: [
+        { len: size1L, wid: size1W },
+        { len: size2L, wid: size2W },
+      ],
+    });
+
+    try {
+      await addedItem.save();
+    } catch (error) {
+      return res.status(500).json({ msg: 'Server Error: Could not add item.' });
+    }
+
+    res.status(201).json(addedItem);
   }
 );
 

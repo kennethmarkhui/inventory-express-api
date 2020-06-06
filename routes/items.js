@@ -27,7 +27,7 @@ router.post(
     check('name', 'Name must not be empty.').not().isEmpty(),
     check('storage', 'Storage must not be empty.').not().isEmpty(),
     check('category', 'Category must not be empty.').not().isEmpty(),
-    check('country', 'Please provide a country.').not().isEmpty(),
+    check('location.country', 'Please provide a country.').not().isEmpty(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
@@ -47,12 +47,8 @@ router.post(
       storage,
       category,
       period,
-      country,
-      area,
-      size1L,
-      size1W,
-      size2L,
-      size2W,
+      location,
+      sizes,
     } = req.body;
 
     let existingItem;
@@ -65,7 +61,7 @@ router.post(
     if (existingItem) {
       return res.status(400).json({
         msg:
-          'The Ref ID you provided already exists in the database. Please enter a new Ref ID.',
+          'The Reference ID you provided already exists in the database. Please enter a new Reference ID.',
       });
     }
 
@@ -78,11 +74,8 @@ router.post(
       storage,
       category,
       period: period || null,
-      location: { country: country, area: area || null },
-      sizes: [
-        { len: size1L, wid: size1W },
-        { len: size2L, wid: size2W },
-      ],
+      location: { country: location.country, area: location.area || null },
+      sizes,
     });
 
     try {

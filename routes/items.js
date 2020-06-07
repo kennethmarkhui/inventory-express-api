@@ -19,6 +19,26 @@ router.get('/', async (req, res) => {
   res.json(items);
 });
 
+// GET api/items/:id
+router.get('/:id', async (req, res) => {
+  const itemId = req.params.id;
+
+  let item;
+  try {
+    item = await Item.findById(itemId);
+  } catch (error) {
+    return res.status(500).json({ msg: 'Server Error: Could not find item.' });
+  }
+
+  if (!item) {
+    return res
+      .status(404)
+      .json({ msg: 'Could not find item for the provided ID.' });
+  }
+
+  res.json(item);
+});
+
 // POST api/items
 router.post(
   '/',
@@ -88,30 +108,90 @@ router.post(
   }
 );
 
-// GET api/items/:refId
-router.get('/:refId', async (req, res) => {
-  const itemRefId = req.params.refId;
-
-  let item;
-  try {
-    item = await Item.findOne({ refId: itemRefId });
-  } catch (error) {
-    return res.status(500).json({ msg: 'Server Error: Could not find item.' });
-  }
-
-  if (!item) {
-    return res
-      .status(404)
-      .json({ msg: 'Could not find item for the provided refId.' });
-  }
-
-  res.json(item);
-});
-
 // PATCH api/items/:id
-router.patch('/:id', (req, res) => {
-  res.send('update item');
-});
+router.patch(
+  '/:id',
+  [
+    check('refId', 'Reference ID should not be empty.').not().isEmpty(),
+    check('name', 'Name must not be empty.').not().isEmpty(),
+    check('storage', 'Storage must not be empty.').not().isEmpty(),
+    check('category', 'Category must not be empty.').not().isEmpty(),
+    check('location.country', 'Please provide a country.').not().isEmpty(),
+  ],
+  async (req, res) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      let errMsgs = [];
+      errors.errors.map((err) => errMsgs.push(err.param));
+      return res.status(422).json({
+        msg: `Invalid Input: Please check the following data: ${errMsgs.join(
+          ', '
+        )}`,
+      });
+    }
+
+    const itemId = req.params.id;
+    const {
+      refId,
+      prevRefId,
+      name,
+      storage,
+      category,
+      period,
+      location,
+      sizes,
+    } = req.body;
+
+    let itemToUpdate;
+    try {
+      itemToUpdate = await Item.findById(itemId);
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ msg: 'Server Error: Could not update item.' });
+    }
+
+    if (!itemToUpdate) {
+      return res
+        .status(404)
+        .json({ msg: 'Could not find item for the provided ID.' });
+    }
+
+    let existingItem;
+    try {
+      existingItem = await Item.findOne({ refId });
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ msg: 'Server Error: Could not check if item exist.' });
+    }
+
+    if (existingItem && existingItem.refId !== prevRefId) {
+      return res.status(400).json({
+        msg:
+          'The Reference ID you provided already exists in the database. Please enter a new Reference ID.',
+      });
+    }
+
+    itemToUpdate.refId = refId;
+    itemToUpdate.name = name;
+    itemToUpdate.storage = storage;
+    itemToUpdate.category = category;
+    itemToUpdate.period = period;
+    itemToUpdate.location = location;
+    itemToUpdate.sizes = sizes;
+
+    try {
+      await itemToUpdate.save();
+    } catch (error) {
+      return res
+        .status(500)
+        .json({ msg: 'Server Error: Could not update item.' });
+    }
+
+    res.json(itemToUpdate);
+  }
+);
 
 // DELETE api/items/:id
 router.delete('/:id', async (req, res) => {
@@ -140,7 +220,7 @@ router.delete('/:id', async (req, res) => {
       .json({ msg: 'Server Error: Could not delete item.' });
   }
 
-  res.status(200).json({ msg: 'Item has be succesfully deleted.' });
+  res.json({ msg: 'Item has be succesfully deleted.' });
 });
 
 module.exports = router;

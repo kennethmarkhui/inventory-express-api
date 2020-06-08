@@ -1,4 +1,5 @@
 const express = require('express');
+const path = require('path');
 
 const connectDB = require('./config/db');
 
@@ -9,6 +10,8 @@ connectDB();
 
 // Middleware
 app.use(express.json({ extended: false }));
+
+app.use('/images/items', express.static(path.join('images', 'items')));
 
 app.use((req, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');

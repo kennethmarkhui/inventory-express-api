@@ -1,6 +1,34 @@
+const fs = require('fs');
 const express = require('express');
-const router = express.Router();
+const { v4: uuidv4 } = require('uuid');
+const multer = require('multer');
 const { check, validationResult } = require('express-validator');
+
+const router = express.Router();
+
+const MIME_TYPE_MAP = {
+  'image/png': 'png',
+  'image/jpeg': 'jpeg',
+  'image/jpg': 'jpg',
+};
+
+const fileUpload = multer({
+  limits: { fileSize: 2000000 }, //2MB
+  storage: multer.diskStorage({
+    destination: (req, file, cb) => {
+      cb(null, 'images/items');
+    },
+    filename: (req, file, cb) => {
+      const ext = MIME_TYPE_MAP[file.mimetype];
+      cb(null, uuidv4() + '.' + ext);
+    },
+  }),
+  fileFilter: (req, file, cb) => {
+    const isValid = !!MIME_TYPE_MAP[file.mimetype];
+    let error = isValid ? null : new Error('Invalid mime type!');
+    cb(error, isValid);
+  },
+});
 
 const Item = require('../models/Item');
 
@@ -42,16 +70,23 @@ router.get('/:id', async (req, res) => {
 // POST api/items
 router.post(
   '/',
+  fileUpload.single('image'),
   [
     check('refId', 'Reference ID should not be empty.').not().isEmpty(),
     check('name', 'Name must not be empty.').not().isEmpty(),
     check('storage', 'Storage must not be empty.').not().isEmpty(),
     check('category', 'Category must not be empty.').not().isEmpty(),
-    check('location.country', 'Please provide a country.').not().isEmpty(),
   ],
   async (req, res) => {
+    // console.log(req.body);
+
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       let errMsgs = [];
       errors.errors.map((err) => errMsgs.push(err.param));
       return res.status(422).json({
@@ -75,10 +110,20 @@ router.post(
     try {
       existingItem = await Item.findOne({ refId });
     } catch (error) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       return res.status(500).json({ msg: 'Server Error: Could not add item.' });
     }
 
     if (existingItem) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       return res.status(400).json({
         msg:
           'The Reference ID you provided already exists in the database. Please enter a new Reference ID.',
@@ -87,20 +132,29 @@ router.post(
 
     const addedItem = new Item({
       refId,
-      image: `https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/${
-        Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000
-      }/${Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000}`,
+      image: req.file.path,
+      // image: `https://picsum.photos/id/${Math.floor(Math.random() * 1000)}/${
+      //   Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000
+      // }/${Math.floor(Math.random() * (2000 - 1000 + 1)) + 1000}`,
       name,
       storage,
       category,
       period: period || null,
-      location: { country: location.country, area: location.area || null },
-      sizes,
+      location: {
+        country: JSON.parse(location).country,
+        area: JSON.parse(location).area || null,
+      },
+      sizes: JSON.parse(sizes),
     });
 
     try {
       await addedItem.save();
     } catch (error) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       return res.status(500).json({ msg: 'Server Error: Could not add item.' });
     }
 
@@ -212,6 +266,8 @@ router.delete('/:id', async (req, res) => {
       .json({ msg: 'Could not find item for the provided id.' });
   }
 
+  const imagePath = item.image;
+
   try {
     await item.remove();
   } catch (error) {
@@ -219,6 +275,10 @@ router.delete('/:id', async (req, res) => {
       .status(500)
       .json({ msg: 'Server Error: Could not delete item.' });
   }
+
+  fs.unlink(imagePath, (err) => {
+    console.log(err);
+  });
 
   res.json({ msg: 'Item has be succesfully deleted.' });
 });

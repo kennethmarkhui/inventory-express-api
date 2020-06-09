@@ -16,7 +16,7 @@ const fileUpload = multer({
   limits: { fileSize: 2000000 }, //2MB
   storage: multer.diskStorage({
     destination: (req, file, cb) => {
-      cb(null, 'images/items');
+      cb(null, 'uploads/images');
     },
     filename: (req, file, cb) => {
       const ext = MIME_TYPE_MAP[file.mimetype];
@@ -78,8 +78,6 @@ router.post(
     check('category', 'Category must not be empty.').not().isEmpty(),
   ],
   async (req, res) => {
-    // console.log(req.body);
-
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       if (req.file) {
@@ -165,16 +163,21 @@ router.post(
 // PATCH api/items/:id
 router.patch(
   '/:id',
+  fileUpload.single('image'),
   [
     check('refId', 'Reference ID should not be empty.').not().isEmpty(),
     check('name', 'Name must not be empty.').not().isEmpty(),
     check('storage', 'Storage must not be empty.').not().isEmpty(),
     check('category', 'Category must not be empty.').not().isEmpty(),
-    check('location.country', 'Please provide a country.').not().isEmpty(),
   ],
   async (req, res) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       let errMsgs = [];
       errors.errors.map((err) => errMsgs.push(err.param));
       return res.status(422).json({
@@ -188,6 +191,7 @@ router.patch(
     const {
       refId,
       prevRefId,
+      prevImage,
       name,
       storage,
       category,
@@ -200,12 +204,22 @@ router.patch(
     try {
       itemToUpdate = await Item.findById(itemId);
     } catch (error) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       return res
         .status(500)
         .json({ msg: 'Server Error: Could not update item.' });
     }
 
     if (!itemToUpdate) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       return res
         .status(404)
         .json({ msg: 'Could not find item for the provided ID.' });
@@ -215,12 +229,22 @@ router.patch(
     try {
       existingItem = await Item.findOne({ refId });
     } catch (error) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       return res
         .status(500)
         .json({ msg: 'Server Error: Could not check if item exist.' });
     }
 
     if (existingItem && existingItem.refId !== prevRefId) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       return res.status(400).json({
         msg:
           'The Reference ID you provided already exists in the database. Please enter a new Reference ID.',
@@ -231,18 +255,31 @@ router.patch(
     itemToUpdate.name = name;
     itemToUpdate.storage = storage;
     itemToUpdate.category = category;
-    itemToUpdate.period = period;
-    itemToUpdate.location = location;
-    itemToUpdate.sizes = sizes;
+    itemToUpdate.period = period || null;
+    itemToUpdate.location = {
+      country: JSON.parse(location).country,
+      area: JSON.parse(location).area || null,
+    };
+    itemToUpdate.sizes = JSON.parse(sizes);
+    if (req.file) {
+      itemToUpdate.image = req.file.path;
+      fs.unlink(prevImage, (err) => {
+        console.log(err);
+      });
+    }
 
     try {
       await itemToUpdate.save();
     } catch (error) {
+      if (req.file) {
+        fs.unlink(req.file.path, (err) => {
+          console.log(err);
+        });
+      }
       return res
         .status(500)
         .json({ msg: 'Server Error: Could not update item.' });
     }
-
     res.json(itemToUpdate);
   }
 );

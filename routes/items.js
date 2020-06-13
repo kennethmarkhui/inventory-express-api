@@ -34,17 +34,44 @@ const Item = require('../models/Item');
 
 // GET api/items
 router.get('/', async (req, res) => {
-  let items;
+  const page = +req.query.page || 1;
+  const itemsPerPage = 2;
+
+  let totalItems;
   try {
-    items = await Item.find()
-      .collation({ locale: 'en', numericOrdering: true })
-      .sort({ refId: 1 });
+    totalItems = await Item.find().countDocuments();
+    // console.log('Total Items:', totalItems);
   } catch (error) {
     return res
       .status(500)
       .json({ msg: 'Server Error: Could not fetch items.' });
   }
-  res.json(items);
+
+  let items;
+  try {
+    items = await Item.find()
+      .collation({ locale: 'en', numericOrdering: true })
+      .sort({ refId: 1 })
+      .skip((page - 1) * itemsPerPage)
+      .limit(itemsPerPage);
+  } catch (error) {
+    return res
+      .status(500)
+      .json({ msg: 'Server Error: Could not fetch items.' });
+  }
+  res.json({
+    items,
+    pagination: {
+      totalItems,
+      hasNextPage: itemsPerPage * page < totalItems,
+      hasPreviousPage: page > 1,
+      nextPage: page + 1,
+      previousPage: page - 1,
+      firstPage: 1,
+      lastPage: Math.ceil(totalItems / itemsPerPage),
+      currentPage: page,
+    },
+  });
 });
 
 // GET api/items/:id

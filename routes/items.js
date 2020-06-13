@@ -33,7 +33,7 @@ const fileUpload = multer({
 const Item = require('../models/Item');
 
 // GET api/items
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   const page = +req.query.page || 1;
   const itemsPerPage = 2;
 
@@ -41,10 +41,10 @@ router.get('/', async (req, res) => {
   try {
     totalItems = await Item.find().countDocuments();
     // console.log('Total Items:', totalItems);
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ msg: 'Server Error: Could not fetch items.' });
+  } catch (err) {
+    const error = new Error('Server Error: Could not fetch items.');
+    error.code = 500;
+    return next(error);
   }
 
   let items;
@@ -54,10 +54,10 @@ router.get('/', async (req, res) => {
       .sort({ refId: 1 })
       .skip((page - 1) * itemsPerPage)
       .limit(itemsPerPage);
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ msg: 'Server Error: Could not fetch items.' });
+  } catch (err) {
+    const error = new Error('Server Error: Could not fetch items.');
+    error.code = 500;
+    return next(error);
   }
   res.json({
     items,
@@ -75,20 +75,22 @@ router.get('/', async (req, res) => {
 });
 
 // GET api/items/:id
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   const itemId = req.params.id;
 
   let item;
   try {
     item = await Item.findById(itemId);
-  } catch (error) {
-    return res.status(500).json({ msg: 'Server Error: Could not find item.' });
+  } catch (err) {
+    const error = new Error('Server Error: Could not find item.');
+    error.code = 500;
+    return next(error);
   }
 
   if (!item) {
-    return res
-      .status(404)
-      .json({ msg: 'Could not find item for the provided ID.' });
+    const error = new Error('Could not find item for the provided ID.');
+    error.code = 404;
+    return next(error);
   }
 
   res.json(item);
@@ -104,21 +106,16 @@ router.post(
     check('storage', 'Storage must not be empty.').not().isEmpty(),
     check('category', 'Category must not be empty.').not().isEmpty(),
   ],
-  async (req, res) => {
+  async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
       let errMsgs = [];
       errors.errors.map((err) => errMsgs.push(err.param));
-      return res.status(422).json({
-        msg: `Invalid Input: Please check the following data: ${errMsgs.join(
-          ', '
-        )}`,
-      });
+      const error = new Error(
+        `Invalid Input: Please check the following data: ${errMsgs.join(', ')}`
+      );
+      error.code = 422;
+      return next(error);
     }
 
     const {
@@ -134,25 +131,18 @@ router.post(
     let existingItem;
     try {
       existingItem = await Item.findOne({ refId });
-    } catch (error) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
-      return res.status(500).json({ msg: 'Server Error: Could not add item.' });
+    } catch (err) {
+      const error = new Error('Server Error: Could not add item.');
+      error.code = 500;
+      return next(error);
     }
 
     if (existingItem) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
-      return res.status(400).json({
-        msg:
-          'The Reference ID you provided already exists in the database. Please enter a new Reference ID.',
-      });
+      const error = new Error(
+        'The Reference ID you provided already exists in the database. Please enter a new Reference ID.'
+      );
+      error.code = 400;
+      return next(error);
     }
 
     const addedItem = new Item({
@@ -174,13 +164,10 @@ router.post(
 
     try {
       await addedItem.save();
-    } catch (error) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
-      return res.status(500).json({ msg: 'Server Error: Could not add item.' });
+    } catch (err) {
+      const error = new Error('Server Error: Could not add item.');
+      error.code = 500;
+      return next(error);
     }
 
     res.status(201).json(addedItem);
@@ -197,21 +184,16 @@ router.patch(
     check('storage', 'Storage must not be empty.').not().isEmpty(),
     check('category', 'Category must not be empty.').not().isEmpty(),
   ],
-  async (req, res) => {
+  async (req, res, next) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
       let errMsgs = [];
       errors.errors.map((err) => errMsgs.push(err.param));
-      return res.status(422).json({
-        msg: `Invalid Input: Please check the following data: ${errMsgs.join(
-          ', '
-        )}`,
-      });
+      const error = new Error(
+        `Invalid Input: Please check the following data: ${errMsgs.join(', ')}`
+      );
+      error.code = 422;
+      return next(error);
     }
 
     const itemId = req.params.id;
@@ -230,52 +212,33 @@ router.patch(
     let itemToUpdate;
     try {
       itemToUpdate = await Item.findById(itemId);
-    } catch (error) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
-      return res
-        .status(500)
-        .json({ msg: 'Server Error: Could not update item.' });
+    } catch (err) {
+      const error = new Error('Server Error: Could not update item.');
+      error.code = 500;
+      return next(error);
     }
 
     if (!itemToUpdate) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
-      return res
-        .status(404)
-        .json({ msg: 'Could not find item for the provided ID.' });
+      const error = new Error('Could not find item for the provided ID.');
+      error.code = 404;
+      return next(error);
     }
 
     let existingItem;
     try {
       existingItem = await Item.findOne({ refId });
-    } catch (error) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
-      return res
-        .status(500)
-        .json({ msg: 'Server Error: Could not check if item exist.' });
+    } catch (err) {
+      const error = new Error('Server Error: Could not check if item exist.');
+      error.code = 500;
+      return next(error);
     }
 
     if (existingItem && existingItem.refId !== prevRefId) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
-      return res.status(400).json({
-        msg:
-          'The Reference ID you provided already exists in the database. Please enter a new Reference ID.',
-      });
+      const error = new Error(
+        'The Reference ID you provided already exists in the database. Please enter a new Reference ID.'
+      );
+      error.code = 400;
+      return next(error);
     }
 
     itemToUpdate.refId = refId;
@@ -291,57 +254,56 @@ router.patch(
     if (req.file) {
       itemToUpdate.image = req.file.path;
       fs.unlink(prevImage, (err) => {
-        console.log(err);
+        if (err) throw err;
+        console.log(
+          prevImage + ' has been deleted and replaced with ' + req.file.path
+        );
       });
     }
 
     try {
       await itemToUpdate.save();
-    } catch (error) {
-      if (req.file) {
-        fs.unlink(req.file.path, (err) => {
-          console.log(err);
-        });
-      }
-      return res
-        .status(500)
-        .json({ msg: 'Server Error: Could not update item.' });
+    } catch (err) {
+      const error = new Error('Server Error: Could not update item.');
+      error.code = 500;
+      return next(error);
     }
     res.json(itemToUpdate);
   }
 );
 
 // DELETE api/items/:id
-router.delete('/:id', async (req, res) => {
+router.delete('/:id', async (req, res, next) => {
   const itemId = req.params.id;
 
   let item;
   try {
     item = await Item.findById(itemId);
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ msg: 'Server Error: Could not delete item.' });
+  } catch (err) {
+    const error = new Error('Server Error: Could not delete item.');
+    error.code = 500;
+    return next(error);
   }
 
   if (!item) {
-    return res
-      .status(404)
-      .json({ msg: 'Could not find item for the provided id.' });
+    const error = new Error('Could not find item for the provided id.');
+    error.code = 404;
+    return next(error);
   }
 
   const imagePath = item.image;
 
   try {
     await item.remove();
-  } catch (error) {
-    return res
-      .status(500)
-      .json({ msg: 'Server Error: Could not delete item.' });
+  } catch (err) {
+    const error = new Error('Server Error: Could not delete item..');
+    error.code = 500;
+    return next(error);
   }
 
   fs.unlink(imagePath, (err) => {
-    console.log(err);
+    if (err) throw err;
+    console.log(imagePath + ' has been deleted.');
   });
 
   res.json({ msg: 'Item has be succesfully deleted.' });
